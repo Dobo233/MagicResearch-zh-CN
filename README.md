@@ -4,7 +4,7 @@
 
 ## 下载
 
-到 [**Releases**](../../releases/latest) 下载 `MagicResearch-中文汉化补丁-v1.3.zip`。
+到 [**Releases**](../../releases/latest) 下载 `MagicResearch-中文汉化补丁-v1.4.zip`。
 
 ## 使用方法
 
@@ -29,12 +29,12 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 
 ## 特性
 
-- **覆盖 3015 条词条**：替换 4593 处字符串 + 重命名 2098 处标识符
+- **覆盖 3022 条词条**：替换 4607 处字符串 + 重命名 2267 处标识符
 - **界面、法术、物品、建筑、升级、挑战、地下城、图鉴、帮助说明书、全部事件与剧情、学派攻略、开发者留言** 均已汉化
 - **存档双向兼容**：英文旧存档直接可用；**游戏内导出的存档也能拿到原版游戏里导入**（见下节）
 - **不碰存档文件**：只修改 `resources\app.asar`
 
-## 存档兼容（v1.3）
+## 存档兼容（v1.4）
 
 汉化把「值即键」的枚举**连标识符一起改了名**（`Conjuration` → `咒法`、`TimePieces` → `时间碎片`），
 所以存档里的键也会跟着变。补丁往 `index.html` 注入一个约 53KB 的兼容层
@@ -53,9 +53,9 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 
 兼容层靠三张表：
 
-1. **显示名/值表**（1448 条）：词典里的短字符串，按词表反查。
-2. **反查表**（370 条）= 结构性键 + 注册表规范名：
-   - **结构性键**（`rename-idents.json`，36 项）优先级最高。这些键取的是枚举**成员的值**，
+1. **显示名/值表**（1665 条）：词典里的短字符串，按词表反查（含句末带 `!`/`?`/`.` 的整句词条）。
+2. **反查表**（375 条）= 结构性键 + 注册表规范名：
+   - **结构性键**（`rename-idents.json`，41 项）优先级最高。这些键取的是枚举**成员的值**，
      不一定等于成员名 —— `e.TimePieces="Time Pieces"` 的键是 `"Time Pieces"`，不是 `TimePieces`。
      少了这张表，「时间碎片」会被反查成显示名 `Time Piece`，原版查 `Resource.TimePieces` 就落空，
      资源上限/强化等级会直接丢。
@@ -64,8 +64,21 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
      反查必须回到注册表里的那个名字 —— `熔炉` 必须是 `Furnace`（不是词典显示名 `Furnaces`）、
      `法力碎片` 必须是 `Mana Shard`（不是 `The Mana Shard`）、`迟缓` 必须是 `Slow`（不是 `Slowed`）。
      建筑名与怪物名撞车时**建筑名优先**。
-3. **自指枚举值保护表**（303 条）：有些枚举成员的值就是成员名、且刻意保留英文（`e.Combat="Combat"`）。
+3. **自指枚举值保护表**（298 条）：有些枚举成员的值就是成员名、且刻意保留英文（`e.Combat="Combat"`）。
    它们既当存档键、又当代码里比较的枚举值，读入时**不能**翻译 —— 只挡「值」，键照常翻。
+
+### v1.4 修的问题
+
+1. **背包槽位 `Hand`/`Body`/`Accessory`、校园分组 `Gather`/`Ancient` 一直是英文**：
+   它们是 `e.X="X"` 自指枚举，值既是显示文本又是查表键，被自指枚举保护挡住。
+   现在按「值即键」规则同时改字符串与标识符（`rename-idents.json` 36 → 41 项），
+   槽位名显示为 **手部 / 身体 / 饰品**，校园分组显示为 **采集 / 远古**；
+   存档 `equipment` 的键照旧往返（内存中文 ↔ 磁盘 `Hand`/`Body`/`Accessory`）。
+2. **两段结局正文 + Demo 帮助未翻译**（约 9,700 字符）：`creation_ending`（3,882）、
+   `standard_ending`（3,450）、`HelpLoaderDemo.tsx` 的**退休**帮助（2,382）都已翻译，段落与标记按原文保留。
+3. **拼串键在中文文本内部被误替换**：存档里当 id 用的「你的研究员获得灵感！」曾被替换成
+   「你的Researchers获得灵感！」。现在片段替换要求两侧是**非字母数字且非中日韩**字符，
+   并补上 `Master of ` 这类「以空格结尾的前缀词条」的反向映射，`secret_Storyline_*`、`temporaryEffects` 键正确还原。
 
 ### v1.3 修的两个问题
 
@@ -86,6 +99,12 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 - 实机：内存里 `exploration.explorationStatus === "Combat"`，读档后探索持续推进（敌人 HP 2619 → 474、时间 +45 秒、无异常）
 - 导出串与磁盘存档 **0 个中文键**；`upgrade:Mana Crystal` / `Conjuration_mastery_event_triggered` 等拼串键正确
 
+### 已验证（v1.4）
+
+- 实机：背包显示 **手部：空 / 身体：空 / 饰品：空**（无 `Hand`/`Body`/`Accessory`），校园分组标题是 **采集**（无 `Gather`），无异常
+- 三种模式（仓库 / 已安装 asar / 发布包重打）**全部通过**；重建后三段中文在 `renderer.js` 里、英文原文已消失
+- 全文扫描：游戏代码里仍是英文原文的只剩内部标识符、枚举成员、无障碍标签、格式串，无可显示文本
+
 ### 已知限制
 
 导回原版时，**存档里已经存下来的历史文本**仍是中文。游戏会把渲染好的成品文本写进存档
@@ -96,8 +115,9 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 
 1. **不要点 Steam 的「验证游戏文件完整性」**，那会覆盖掉汉化。建议把更新设为「仅在我启动时更新」。
 2. 部分**字符串拼接**的提示可能夹英文（如 `"Gather more " + 资源 + "!"`），这类片段只翻译了能翻译的部分。
-3. 有 **8 个词刻意保留英文**：`Research` / `Gather` / `Combat` / `None` / `Power` / `Loot` / `Cost` / `Storyline`。
-   它们既是显示文本又是存档里的查表键，翻译会破坏旧档兼容。
+3. 有 **7 个词刻意保留英文**：`Research` / `Combat` / `None` / `Power` / `Loot` / `Cost` / `Storyline`。
+   它们既是显示文本又是存档里的查表键，翻译会破坏旧档兼容（`Gather`/`Hand`/`Body`/`Accessory`/`Ancient`
+   已在 v1.4 按「字符串 + 标识符一起改」的完整做法翻掉）。
 
 ## 修改翻译
 
@@ -152,6 +172,14 @@ tools/
 ```
 
 ## 更新记录
+
+- **v1.4**：补齐最后一批可见英文
+  - 背包槽位 `Hand`/`Body`/`Accessory` → **手部/身体/饰品**，校园分组 `Gather`/`Ancient` → **采集/远古**
+    （自指枚举按「值即键」规则同时改字符串 + 标识符，`rename-idents.json` 36 → 41 项；存档 `equipment` 键仍往返）
+  - 翻译两段结局正文（3,882 + 3,450 字符）与 Demo 版**退休**帮助（2,382 字符）
+  - 片段替换边界收紧：**不在中文文本内部**做片段替换；右侧允许孤立复数 `s`；
+    显示名表纳入句末标点整句词条与 `Master of ` 这类前缀词条（`secret_Storyline_*`、`temporaryEffects` 键还原正确）
+  - 词条 3015  3022，替换 4593  4607，标识符重命名 2098  2267
 
 - **v1.3**：修复「导入原版后少设施」和「探索到一半停止」
   - 反查表加入**注册表规范名**（`getName` / `getSpellName` / `getBuildingName`），

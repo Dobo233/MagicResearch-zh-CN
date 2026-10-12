@@ -34,5 +34,10 @@
   "CritChance": "暴击率",
   "Storage": "存储",
   "Housing": "住宅",
-  "Production": "生产"
+  "Production": "生产",
+  "Hand": "手部",
+  "Body": "身体",
+  "Accessory": "饰品",
+  "Gather": "采集",
+  "Ancient": "远古"
 }

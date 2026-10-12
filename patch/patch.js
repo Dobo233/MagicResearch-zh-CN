@@ -220,7 +220,7 @@ console.log('翻译替换 '+litHit+' 处，标识符重命名 '+idHit+' 处，�
 /* ---------- 5. 生成并注入「存档双向兼容层」 ---------- */
 /* 显示名/值：英 -> 中，用于读入；反查成英时用 */
 const nameLike=Object.entries(translations).filter(([k])=>
-  k.length<=48 && !/[\n\t]/.test(k) && !/[*_`]/.test(k) && !/[.!?]$/.test(k) && /^[A-Za-z]/.test(k));
+  k.length<=48 && !/[\n\t]/.test(k) && !/[*_`]/.test(k) && /^[A-Za-z]/.test(k));
 /* 结构性键（rename-idents）：中文 -> 原版真正的键，反查时优先级最高。
    少了它，「时间碎片」会被反查成显示名 "Time Piece"，原版查 Resource.TimePieces 就落空。 */
 const {makeShim, buildKeyMap, extractProtectedValues}=require('./shim.js');
