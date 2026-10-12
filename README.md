@@ -41,6 +41,24 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 3. 有 **8 个词刻意保留英文**：`Research` / `Gather` / `Combat` / `None` / `Power` / `Loot` / `Cost` / `Storyline`。
    它们既是显示文本又是存档里的查表键，翻译会破坏旧档兼容。
 
+## 修改翻译
+
+翻译词典在 `patch/data/translations.json`（「英文原文  中文」，3015 条）。
+
+仓库带了 `dict.bat` 工具：
+
+```bat
+dict.bat find 法力                        搜索（英文原文或中文都能搜）
+dict.bat set  "Campus" "学院"              修改／新增
+dict.bat rm   "Campus"                    删除该条（保持英文）
+dict.bat setenum Mana "法力值"             改组「值即键」的枚举名（会同时改两个文件）
+```
+
+改完**重新运行 `install.bat`** 即可生效补丁会自动从 `app.asar.orig-汉化前` 重新生成，
+所以可以**反复改、反复重打**，不会累积错误。
+
+详细说明见 [如何修改翻译.md](如何修改翻译.md)。
+
 ## 原理
 
 游戏的全部文本硬编码在 `renderer.js`（16.4MB 的 webpack 产物）的字符串字面量里，没有 i18n 框架。

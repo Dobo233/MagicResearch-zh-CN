@@ -58,7 +58,11 @@ const gameDir=path.dirname(path.dirname(asarPath));
 console.log('游戏目录: '+gameDir);
 
 /* ---------- 2. 读取 asar ---------- */
-const {fd, header, base}=readAsar(asarPath);
+/* 优先从「未汉化的原始备份」重新生成：这样改完词典直接重跑即可，不必手动还原 */
+const pristine=path.join(path.dirname(asarPath),'app.asar.orig-\u6c49\u5316\u524d');
+let srcAsar=asarPath;
+if(fs.existsSync(pristine)){ srcAsar=pristine; console.log('\u2192 \u4f7f\u7528\u539f\u59cb\u5907\u4efd\u4f5c\u4e3a\u6e90\u6587\u4ef6\u91cd\u65b0\u751f\u6210'); }
+const {fd, header, base}=readAsar(srcAsar);
 function readEntry(name){
   let n=header; for(const seg of name.split('/')) n=n.files[seg];
   if(!n) return null;
@@ -74,7 +78,11 @@ if(!srcBuf){ console.error(' app.asar 里没有 renderer.js，游戏版本可能
 const src=srcBuf.toString('utf8');
 const html0=htmlBuf?htmlBuf.toString('utf8'):null;
 
-if(src.includes('中文汉化补丁') || (html0 && html0.includes('中文汉化补丁'))){ console.log('ℹ  这个游戏已经打过汉化补丁，无需重复安装。'); process.exit(0); }
+if(srcAsar===asarPath && (src.includes('中文汉化补丁') || (html0&&html0.includes('中文汉化补丁')))){
+  console.log('ℹ  这个游戏已经打过汉化补丁，而且没有找到原始备份，无法自动重新生成。');
+  console.log('   如果要改词典后重打，请先手动把 app.asar.orig-汉化前 恢复为 app.asar。');
+  process.exit(0);
+}
 
 /* ---------- 3. 扫描字符串 + source map 归因 ---------- */
 function decode(raw){
@@ -171,6 +179,24 @@ for(const l of lits){
   litHit++;
   edits.push({start:l.start,end:l.end,text:JSON.stringify(translations[v]),kind:'lit',value:v});
 }
+/* 一致性自检：rename-idents 的每一项，都必须有对应的字符串翻译，否则枚举「值」和「键」会不一致 */
+try{
+  const selfRef={}; const re=/([A-Za-z_$][\w$]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g; let mm;
+  while((mm=re.exec(src))!==null){ if(mm[1]===mm[2]) selfRef[mm[1]]=mm[2]; }
+  const bad=[];
+  for(const id of Object.keys(renameMap)){
+    const v=selfRef[id];
+    if(v!==undefined && !has(translations,v)) bad.push(id+'  枚举值 "'+v+'" 没有对应翻译');
+  }
+  if(bad.length){
+    console.log('');
+    console.log(' 一致性问题：以下标识符会被改名，但对应的字符串没有翻译，查表会失败');
+    bad.forEach(x=>console.log('   '+x));
+    console.log('    请同时在 rename-idents.json 和 translations.json 里改，或用 tools/dict.js setenum');
+    console.log('');
+  }
+}catch(e){}
+
 let idHit=0;
 let i=0;
 while(i<src.length){
@@ -235,11 +261,11 @@ const overrides={ 'renderer.js':Buffer.from(out,'utf8') };
 if(html) overrides['index.html']=Buffer.from(html,'utf8');
 
 console.log('\n正在打包（约 300MB，请稍候）');
-pack(asarPath, tmpAsar, {getOverride:(p)=>overrides[p]||null}).then(()=>{
+pack(srcAsar, tmpAsar, {getOverride:(p)=>overrides[p]||null}).then(()=>{
   // 备份原文件（只备份一次）
-  const bak=path.join(gameDir,'resources','app.asar.orig-汉化前');
+  const bak=pristine;
   if(!fs.existsSync(bak)){ fs.copyFileSync(asarPath,bak); console.log('已备份原文件 -> '+bak); }
-  else console.log('原文件备份已存在: '+bak);
+  else console.log('原始备份已存在（未覆盖）: '+bak);
   fs.copyFileSync(tmpAsar, asarPath);
   fs.unlinkSync(tmpAsar);
   console.log('\n 汉化安装完成！');
