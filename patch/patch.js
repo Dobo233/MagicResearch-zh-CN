@@ -223,8 +223,11 @@ const nameLike=Object.entries(translations).filter(([k])=>
   k.length<=48 && !/[\n\t]/.test(k) && !/[*_`]/.test(k) && !/[.!?]$/.test(k) && /^[A-Za-z]/.test(k));
 /* 结构性键（rename-idents）：中文 -> 原版真正的键，反查时优先级最高。
    少了它，「时间碎片」会被反查成显示名 "Time Piece"，原版查 Resource.TimePieces 就落空。 */
-const {makeShim, buildKeyMap}=require('./shim.js');
-const keyMap=buildKeyMap(renameMap, src);
+const {makeShim, buildKeyMap, extractProtectedValues}=require('./shim.js');
+const keyMap=buildKeyMap(renameMap, src, translations);
+/* 自指枚举的值（Combat/None/Cost/Loot）：汉化刻意保留英文，读存档时也绝不能翻，
+   否则 explorationStatus===z.ExplorationStatus.Combat 之类的比较会全部落空 */
+const protectedValues=extractProtectedValues(src, renameMap);
 const missingKeys=Object.keys(renameMap).filter(id=>!keyMap[renameMap[id]]);
 if(missingKeys.length){
   console.log('');
@@ -232,8 +235,8 @@ if(missingKeys.length){
   console.log('        导出存档时它们的键可能对不上原版，请检查：');
   missingKeys.forEach(id=>console.log('   '+id+' -> '+renameMap[id]));
 }
-console.log('兼容层映射：显示名/值 '+nameLike.length+' 条，结构性键 '+Object.keys(keyMap).length+' 条');
-const shim=makeShim(Object.fromEntries(nameLike), keyMap);
+console.log('兼容层映射：显示名/值 '+nameLike.length+' 条，反查表（注册表规范名 + 结构性键）'+Object.keys(keyMap).length+' 条，自指枚举值保护 '+protectedValues.length+' 条');
+const shim=makeShim(Object.fromEntries(nameLike), keyMap, protectedValues);
 
 let html=html0;
 if(html){

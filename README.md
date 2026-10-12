@@ -4,7 +4,7 @@
 
 ## 下载
 
-到 [**Releases**](../../releases/latest) 下载 `MagicResearch-中文汉化补丁-v1.2.zip`。
+到 [**Releases**](../../releases/latest) 下载 `MagicResearch-中文汉化补丁-v1.3.zip`。
 
 ## 使用方法
 
@@ -29,36 +29,62 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 
 ## 特性
 
-- **覆盖 3015 条词条**：替换 4657 处字符串 + 重命名 2098 处标识符
+- **覆盖 3015 条词条**：替换 4593 处字符串 + 重命名 2098 处标识符
 - **界面、法术、物品、建筑、升级、挑战、地下城、图鉴、帮助说明书、全部事件与剧情、学派攻略、开发者留言** 均已汉化
 - **存档双向兼容**：英文旧存档直接可用；**游戏内导出的存档也能拿到原版游戏里导入**（见下节）
 - **不碰存档文件**：只修改 `resources\app.asar`
 
-## 存档兼容（v1.2）
+## 存档兼容（v1.3）
 
-汉化把「值即键」的枚举**连标识符一起改了名**（`Conjuration`  `咒法`、`TimePieces`  `时间碎片`），
-所以存档里的键也会跟着变。补丁往 `index.html` 注入一个约 40KB 的兼容层
+汉化把「值即键」的枚举**连标识符一起改了名**（`Conjuration` → `咒法`、`TimePieces` → `时间碎片`），
+所以存档里的键也会跟着变。补丁往 `index.html` 注入一个约 53KB 的兼容层
 （由 `patch/shim.js` 生成），在**读取**和**写出**两处做等价改名：
 
 | 时机 | 方向 | 作用 |
 |---|---|---|
-| `localStorage.getItem` / `JSON.parse` | 英文键  中文键 | 英文旧存档直接能读，不用迁移 |
-| `JSON.stringify` | 中文键  英文键 | 游戏内导出、写回磁盘都是原版格式 |
+| `localStorage.getItem` / `JSON.parse` | 英文键 → 中文键 | 英文旧存档直接能读，不用迁移 |
+| `JSON.stringify` | 中文键 → 英文键 | 游戏内导出、写回磁盘都是原版格式 |
 
 于是：
 
-- **英文旧存档  汉化版**：直接能读
-- **汉化版导出  原版游戏**：能导入（v1.1 及更早做不到，导出的串只有汉化版自己认）
-- **汉化版写盘  原版格式**：哪天卸掉汉化，原版也能直接读同一份存档
+- **英文旧存档 → 汉化版**：直接能读
+- **汉化版导出 → 原版游戏**：能导入（v1.1 及更早做不到，导出的串只有汉化版自己认）
+- **汉化版写盘 → 原版格式**：哪天卸掉汉化，原版也能直接读同一份存档
 
-兼容层靠两张表反查：
+兼容层靠三张表：
 
-1. **显示名/值表**（1448 条）：词典里的短字符串，按词表反查
-2. **结构性键表**（36 条）：`rename-idents.json` 里的枚举，反查时**优先级最高**。
-   因为这些键取的是枚举**成员的值**，不一定等于成员名
-   `e.TimePieces="Time Pieces"` 的键是 `"Time Pieces"`，不是 `TimePieces`。
-   少了这张表，「时间碎片」会被反查成显示名 `Time Piece`，
-   原版查 `Resource.TimePieces` 就落空，资源上限/强化等级会直接丢。
+1. **显示名/值表**（1448 条）：词典里的短字符串，按词表反查。
+2. **反查表**（370 条）= 结构性键 + 注册表规范名：
+   - **结构性键**（`rename-idents.json`，36 项）优先级最高。这些键取的是枚举**成员的值**，
+     不一定等于成员名 —— `e.TimePieces="Time Pieces"` 的键是 `"Time Pieces"`，不是 `TimePieces`。
+     少了这张表，「时间碎片」会被反查成显示名 `Time Piece`，原版查 `Resource.TimePieces` 就落空，
+     资源上限/强化等级会直接丢。
+   - **注册表规范名**：从原版 `renderer.js` 抓 `getName()` / `getSpellName()` / `getBuildingName()`
+     的返回值。游戏把建筑/法术/动作注册在**显示名**下（`o[e.getBuildingName()]=e`），
+     反查必须回到注册表里的那个名字 —— `熔炉` 必须是 `Furnace`（不是词典显示名 `Furnaces`）、
+     `法力碎片` 必须是 `Mana Shard`（不是 `The Mana Shard`）、`迟缓` 必须是 `Slow`（不是 `Slowed`）。
+     建筑名与怪物名撞车时**建筑名优先**。
+3. **自指枚举值保护表**（303 条）：有些枚举成员的值就是成员名、且刻意保留英文（`e.Combat="Combat"`）。
+   它们既当存档键、又当代码里比较的枚举值，读入时**不能**翻译 —— 只挡「值」，键照常翻。
+
+### v1.3 修的两个问题
+
+1. **导入原版后少设施**：反查表撞车时「后写的赢」，把 6 个建筑名带偏
+   （`熔炉→Furnaces`、`发电机→Generators`、`法力间歇泉→Mana Geysers`、`矿场→Mines`、
+   `法力碎片→The Mana Shard`、`时间胶囊→Time Capsules`），原版 `getBuildingAmount` 取不到 → 设施直接消失。
+   另外存档里有一批**拼串键**（`'升级：'+升级名`、`'<学派>_mastery_event_triggered'`、
+   `'mastery_event_'+<学派>`、`'building_stasis_completed_'+建筑名`、带时间戳的事件 id），整串查不到表。
+   现在兼容层在**键**上做「带边界的片段替换」（只在键上做，且要求两侧是非字母数字边界），两类键都能还原。
+2. **探索到一半停止**：读入方向的翻译原本作用在**所有字符串**上，把枚举值也翻了
+   （`"Combat"` → `战斗`、`"Exploring"` → 探索中），而汉化版代码比较的是 `ExplorationStatus.Combat`，
+   读档后状态机对不上，探索就卡住。现在自指枚举值（`Combat` / `Cost` / `Gather` / `Loot` / `None` /
+   `Power` / `Research` / `Storyline` 这 8 个词，外加一批库内部值）读入时保持英文。
+
+### 已验证（v1.3）
+
+- 25 个建筑名全部反查回注册表原名；真实存档导出后原版导入 **25/25 个建筑键与数量完全一致**
+- 实机：内存里 `exploration.explorationStatus === "Combat"`，读档后探索持续推进（敌人 HP 2619 → 474、时间 +45 秒、无异常）
+- 导出串与磁盘存档 **0 个中文键**；`upgrade:Mana Crystal` / `Conjuration_mastery_event_triggered` 等拼串键正确
 
 ### 已知限制
 
@@ -75,7 +101,7 @@ install.bat "D:\Steam\steamapps\common\Magic Research"
 
 ## 修改翻译
 
-翻译词典在 `patch/data/translations.json`（「英文原文  中文」，3015 条）。
+翻译词典在 `patch/data/translations.json`（「英文原文 → 中文」，3015 条）。
 
 仓库带了 `dict.bat` 工具：
 
@@ -126,6 +152,16 @@ tools/
 ```
 
 ## 更新记录
+
+- **v1.3**：修复「导入原版后少设施」和「探索到一半停止」
+  - 反查表加入**注册表规范名**（`getName` / `getSpellName` / `getBuildingName`），
+    修掉 6 个被显示名带偏的建筑键（`Furnace` / `Generator` / `Mana Geyser` / `Mine` /
+    `Mana Shard` / `Time Capsule`），撞车时建筑名优先
+  - 兼容层新增**带边界的片段替换**，还原拼串键：`升级：X` → `upgrade:X`、
+    `咒法_mastery_event_*` → `Conjuration_mastery_event_*`、带时间戳的事件 id 等
+  - 新增**自指枚举值保护表**（303 条）：读入时不再翻译 `Combat` / `None` 这类枚举值，
+    修掉「读档后探索状态机卡住」的根因
+  - 兼容层从约 40KB 增至约 53KB；`verify-compat.js` 19 项断言两种模式全通过
 
 - **v1.2**：修复导出存档无法在原版游戏导入的问题
   - 兼容层从「只会 英中」升级成**双向**：写出时 中英，导出的存档回到原版格式
