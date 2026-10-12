@@ -217,34 +217,23 @@ for(const e of edits){
 }
 console.log('翻译替换 '+litHit+' 处，标识符重命名 '+idHit+' 处，跳过 '+skipped+' 处'+(overlap?('，冲突 '+overlap):''));
 
-/* ---------- 5. 生成并注入「旧存档兼容层」 ---------- */
+/* ---------- 5. 生成并注入「存档双向兼容层」 ---------- */
+/* 显示名/值：英 -> 中，用于读入；反查成英时用 */
 const nameLike=Object.entries(translations).filter(([k])=>
   k.length<=48 && !/[\n\t]/.test(k) && !/[*_`]/.test(k) && !/[.!?]$/.test(k) && /^[A-Za-z]/.test(k));
-const shimMap=JSON.stringify(Object.fromEntries(nameLike));
-const shim=`<script>
-/* === 中文汉化补丁 === 旧英文存档兼容层（自动把英文键转中文键） */
-(function(){try{
-var M=${shimMap},KEY="PlayerContextState",has=Object.prototype.hasOwnProperty;
-function norm(o){
-  if(Array.isArray(o)){for(var i=0;i<o.length;i++)o[i]=norm(o[i]);return o;}
-  if(o&&typeof o==="object"){
-    var ks=Object.keys(o);
-    for(var j=0;j<ks.length;j++){var k=ks[j],v=norm(o[k]);
-      if(has.call(M,k)){o[M[k]]=v;delete o[k];}else{o[k]=v;}}
-    return o;
-  }
-  if(typeof o==="string"&&has.call(M,o))return M[o];
-  return o;
+/* 结构性键（rename-idents）：中文 -> 原版真正的键，反查时优先级最高。
+   少了它，「时间碎片」会被反查成显示名 "Time Piece"，原版查 Resource.TimePieces 就落空。 */
+const {makeShim, buildKeyMap}=require('./shim.js');
+const keyMap=buildKeyMap(renameMap, src);
+const missingKeys=Object.keys(renameMap).filter(id=>!keyMap[renameMap[id]]);
+if(missingKeys.length){
+  console.log('');
+  console.log(' 警告：以下「值即键」枚举没能在 renderer.js 里找到 标识符="值" 的定义，');
+  console.log('        导出存档时它们的键可能对不上原版，请检查：');
+  missingKeys.forEach(id=>console.log('   '+id+' -> '+renameMap[id]));
 }
-var g=Storage.prototype.getItem;
-Storage.prototype.getItem=function(k){var v=g.call(this,k);
-  if(k===KEY&&typeof v==="string"&&v.charCodeAt(0)===123){try{return JSON.stringify(norm(JSON.parse(v)));}catch(e){}}
-  return v;};
-function looksLikeSave(o){return !!o&&typeof o==="object"&&!Array.isArray(o)&&!!o.resources&&!!o.global;}
-var p=JSON.parse;
-JSON.parse=function(){var r=p.apply(this,arguments); if(looksLikeSave(r)){try{norm(r);}catch(e){}} return r;};
-}catch(e){}})();
-</script>`;
+console.log('兼容层映射：显示名/值 '+nameLike.length+' 条，结构性键 '+Object.keys(keyMap).length+' 条');
+const shim=makeShim(Object.fromEntries(nameLike), keyMap);
 
 let html=html0;
 if(html){
